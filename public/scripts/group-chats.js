@@ -72,6 +72,7 @@ import {
     animation_duration,
     depth_prompt_role_default,
     shouldAutoContinue,
+    this_chid,
 } from '../script.js';
 import { printTagList, createTagMapFromList, applyTagsOnCharacterSelect, tag_map } from './tags.js';
 import { FILTER_TYPES, FilterHelper } from './filters.js';
@@ -812,13 +813,20 @@ async function generateGroupWrapper(by_auto_mode, type = null, params = {}) {
             $('#send_textarea').val('')[0].dispatchEvent(new Event('input', { bubbles:true }));
         }
 
+        for (let i = 0; i < activatedMembers.length; ++i){
+            characters[activatedMembers[i]].queueOrder = (i+1);
+        }
+
         // now the real generation begins: cycle through every activated character
         for (const chId of activatedMembers) {
+            console.log("drafting " + chId);
             throwIfAborted();
             deactivateSendButtons();
             const generateType = type == 'swipe' || type == 'impersonate' || type == 'quiet' || type == 'continue' ? type : 'group_chat';
             setCharacterId(chId);
             setCharacterName(characters[chId].name);
+            printGroupMembers();
+
             await eventSource.emit(event_types.GROUP_MEMBER_DRAFTED, chId);
 
             if (type !== 'swipe' && type !== 'impersonate' && !isStreamingEnabled()) {
@@ -839,6 +847,8 @@ async function generateGroupWrapper(by_auto_mode, type = null, params = {}) {
                     messageChunk = textResult?.messageChunk;
                 }
             }
+            activatedMembers.filter(chidx => characters[chidx].queueOrder > 0)
+                            .forEach(chindex => characters[chindex].queueOrder -= 1);
         }
     } finally {
         typingIndicator.hide();
@@ -846,6 +856,13 @@ async function generateGroupWrapper(by_auto_mode, type = null, params = {}) {
         is_group_generating = false;
         setSendButtonState(false);
         setCharacterId(undefined);
+
+        group.members.forEach(avatar => {
+            let character = characters.find(x => x.avatar === avatar || x.name === avatar);
+            character.queueOrder = undefined;
+        });
+        printGroupMembers();
+
         setCharacterName('');
         activateSendButtons();
         showSwipeButtons();
@@ -1261,13 +1278,17 @@ function getGroupCharacterBlock(character) {
     const avatar = getThumbnailUrl('avatar', character.avatar);
     const template = $('#group_member_template .group_member').clone();
     const isFav = character.fav || character.fav == 'true';
+    
     template.data('id', character.avatar);
     template.find('.avatar img').attr({ 'src': avatar, 'title': character.avatar });
-    template.find('.ch_name').text(character.name);
+    template.find('.ch_name').text(character.name + (character.queueOrder > 0?'   (#' + character.queueOrder + ')':''));
     template.attr('chid', characters.indexOf(character));
     template.find('.ch_fav').val(isFav);
     template.toggleClass('is_fav', isFav);
+    template.toggleClass('is_active', character.queueOrder === 1);
+    template.toggleClass('is_queued', character.queueOrder > 1);
     template.toggleClass('disabled', isGroupMemberDisabled(character.avatar));
+    template.toggleClass('is_active', character.avatar === (this_chid && characters[this_chid] && characters[this_chid].avatar));
 
     // Display inline tags
     const tagsElement = template.find('.tags');
@@ -1286,6 +1307,7 @@ function isGroupMemberDisabled(avatarId) {
     const thisGroup = openGroupId && groups.find((x) => x.id == openGroupId);
     return Boolean(thisGroup && thisGroup.disabled_members.includes(avatarId));
 }
+
 
 function onDeleteGroupClick() {
     if (is_group_generating) {
@@ -1581,6 +1603,8 @@ function openCharacterDefinition(characterSelect) {
     }
 
     setCharacterId(chid);
+    console.log("Character ID:", chid);
+    console.log("characters:", characters);
     select_selected_character(chid);
     // Gentle nudge to recalculate tokens
     RA_CountCharTokens();

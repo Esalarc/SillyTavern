@@ -106,6 +106,7 @@
  * @property {string[]} tags - the tags of the character
  * @property {number} talkativeness - talkativeness
  * @property {boolean|string} fav - fav
+ * @property {number} queueOrder - Characters position in the char queue. #1 is currently generating.
  * @property {string} create_date - create_date
  * @property {v2CharData} data - v2 data extension
  * // Non-standard extensions added by the ST server (not part of the original data)
