@@ -741,6 +741,7 @@ async function generateGroupWrapper(by_auto_mode, type = null, params = {}) {
         return Promise.resolve();
     }
 
+    const showChatQueue = (!(typingIndicator.length === 0 && !isStreamingEnabled()) && openGroupId);
     try {
         throwIfAborted();
         hideSwipeButtons();
@@ -813,10 +814,11 @@ async function generateGroupWrapper(by_auto_mode, type = null, params = {}) {
             $('#send_textarea').val('')[0].dispatchEvent(new Event('input', { bubbles:true }));
         }
 
-        for (let i = 0; i < activatedMembers.length; ++i){
-            characters[activatedMembers[i]].queueOrder = (i+1);
+        if (showChatQueue){
+            for (let i = 0; i < activatedMembers.length; ++i){
+                characters[activatedMembers[i]].queueOrder = (i+1);
+            }
         }
-
         // now the real generation begins: cycle through every activated character
         for (const chId of activatedMembers) {
             console.log("drafting " + chId);
@@ -825,7 +827,9 @@ async function generateGroupWrapper(by_auto_mode, type = null, params = {}) {
             const generateType = type == 'swipe' || type == 'impersonate' || type == 'quiet' || type == 'continue' ? type : 'group_chat';
             setCharacterId(chId);
             setCharacterName(characters[chId].name);
-            printGroupMembers();
+            if (showChatQueue){
+                printGroupMembers();
+            }
 
             await eventSource.emit(event_types.GROUP_MEMBER_DRAFTED, chId);
 
@@ -847,8 +851,10 @@ async function generateGroupWrapper(by_auto_mode, type = null, params = {}) {
                     messageChunk = textResult?.messageChunk;
                 }
             }
-            activatedMembers.filter(chidx => characters[chidx].queueOrder > 0)
-                            .forEach(chindex => characters[chindex].queueOrder -= 1);
+            if (showChatQueue){
+                activatedMembers.filter(chidx => characters[chidx].queueOrder > 0)
+                                .forEach(chindex => characters[chindex].queueOrder -= 1);
+            }
         }
     } finally {
         typingIndicator.hide();
@@ -857,12 +863,13 @@ async function generateGroupWrapper(by_auto_mode, type = null, params = {}) {
         setSendButtonState(false);
         setCharacterId(undefined);
 
-        group.members.forEach(avatar => {
-            let character = characters.find(x => x.avatar === avatar || x.name === avatar);
-            character.queueOrder = undefined;
-        });
-        printGroupMembers();
-
+        if (showChatQueue){
+            group.members.forEach(avatar => {
+                let character = characters.find(x => x.avatar === avatar || x.name === avatar);
+                character.queueOrder = undefined;
+            });
+            printGroupMembers();
+        }
         setCharacterName('');
         activateSendButtons();
         showSwipeButtons();
