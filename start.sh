@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # Make sure pwd is the directory of the script
 cd "$(dirname "$0")"
