@@ -242,6 +242,7 @@ import { INTERACTABLE_CONTROL_CLASS, initKeyboard } from './scripts/keyboard.js'
 import { initDynamicStyles } from './scripts/dynamic-styles.js';
 import { SlashCommandEnumValue, enumTypes } from './scripts/slash-commands/SlashCommandEnumValue.js';
 import { enumIcons } from './scripts/slash-commands/SlashCommandCommonEnumsProvider.js';
+import { syncMessageUserNameToPersona } from './scripts/personas.js'
 
 //exporting functions and vars for mods
 export {
@@ -2062,7 +2063,9 @@ function getMessageFromTemplate({
     mes.find('.mes_bias').html(bias);
     mes.find('.timestamp').text(timestamp).attr('title', `${extra?.api ? extra.api + ' - ' : ''}${extra?.model ?? ''}`);
     mes.find('.mesIDDisplay').text(`#${mesId}`);
-    tokenCount && mes.find('.tokenCounterDisplay').text(`${tokenCount}t`);
+    if (!isUser){
+        mes.find('.mes_sync_mes_persona').remove();
+    }    tokenCount && mes.find('.tokenCounterDisplay').text(`${tokenCount}t`);
     title && mes.attr('title', title);
     timerValue && mes.find('.mes_timer').attr('title', timerTitle).text(timerValue);
 
@@ -6587,6 +6590,20 @@ function messageEditAuto(div) {
     saveChatDebounced();
 }
 
+async function messageSyncPersona(div) {
+    const mesElement = div.closest('.mes');
+    const mes = chat[mesElement.attr('mesid')];
+
+    await syncMessageUserNameToPersona(mes);
+
+    mesElement.attr({
+        'ch_name': mes.name,
+        'force_avatar': mes.force_avatar,
+    });
+    mesElement.find('.avatar img').attr('src', mes.force_avatar);
+    mesElement.find('.ch_name .name_text').text(mes.name);
+}
+
 async function messageEditDone(div) {
     let { mesBlock, text, mes, bias } = updateMessage(div);
     if (this_edit_mes_id == 0) {
@@ -10240,6 +10257,10 @@ jQuery(async function () {
         showSwipeButtons();
 
         await eventSource.emit(event_types.MESSAGE_DELETED, chat.length);
+    });
+
+    $(document).on('click', '.mes_sync_mes_persona', async function () {
+        await messageSyncPersona($(this));
     });
 
     $(document).on('click', '.mes_edit_done', async function () {
